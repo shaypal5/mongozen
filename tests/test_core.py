@@ -18,8 +18,7 @@ class Testmongozen(TestCase):
 
     def test_get_collection(self):
         """Tests Matchop and operator."""
-        pass
-        # users_test = _mz_test_collection()
-        # random_user = users_test.find_one()
-        # self.assertIn('user_id', random_user)
+        users_test = _mz_test_collection()
+        random_user = users_test.find_one()
+        self.assertIn('user_id', random_user)
         # self.assertEqual(random_user.user_id, 'user_id')

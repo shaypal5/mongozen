@@ -1,11 +1,13 @@
 envs:
   mongozen_test:
-    mongozen_test:
+    mongozen_env_params:
       connectTimeoutMS: 2500
+    mongozen_test:
       host:
         - 'ds113915.mlab.com'
       port: 13915
-      readPreference: 'secondary'
+      mongozen_server_params:
+        readPreference: 'secondary'
 global_params:
   maxPoolSize: 10
   maxIdleTimeMS: 60000
