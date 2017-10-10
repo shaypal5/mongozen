@@ -1,0 +1,6 @@
+include versioneer.py
+graft mongozen
+include mongozen/_version.py
+recursive-include mongozen *
+recursive-include mongozen *.py
+recursive-include mongozen/data *
