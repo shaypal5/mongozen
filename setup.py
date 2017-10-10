@@ -22,7 +22,7 @@ with open('README.rst') as f:
 
 setuptools.setup(
     author="Shay Palachy",
-    author_email="shay.palachy@gmailcom",
+    author_email="shay.palachy@gmail.com",
     name='mongozen',
     description='Enhance MongoDB for Python dynamic shells and scripts.',
     version=versioneer.get_version(),
