@@ -1,6 +1,5 @@
 
 from ._util import (
-    cachier_mongetter,
     bson_doc_bytesize,
     document_is_not_too_big,
     document_is_strictly_not_too_big,

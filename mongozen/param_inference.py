@@ -10,19 +10,19 @@ from .shared import (
 )
 
 
-DEF_ENV = _mongozen_cfg()['default_env']
-DEF_SERVER = _mongozen_cfg()['default_server']
-INFER_PARAM = _mongozen_cfg()['infer_parameters']
+DEF_ENV = _mongozen_cfg().get('default_env', None)
+DEF_SERVER = _mongozen_cfg().get('default_server', None)
+INFER_PARAM = _mongozen_cfg().get('infer_parameters', False)
 
 
 def _infer_get_client_params(server_name, env_name):
     if server_name is None:
-        if INFER_PARAM:
+        if INFER_PARAM and DEF_SERVER:
             server_name = DEF_SERVER
         else:
             raise ValueError("Missing value for server_name parameter!")
     if env_name is None:
-        if INFER_PARAM:
+        if INFER_PARAM and DEF_ENV:
             env_name = DEF_ENV
         else:
             raise ValueError("Missing value for env_name parameter!")
