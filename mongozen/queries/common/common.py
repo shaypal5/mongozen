@@ -1,8 +1,8 @@
 
 import operator  # for sorting result dicts
+from collections import OrderedDict
 
 from prettytable import PrettyTable  # printing results in pretty ASCII tables
-from strct.dict import get_key_of_max
 
 import mongozen
 
@@ -44,7 +44,7 @@ def count_keys_in(keys_list, collection_obj, verbose=False):
     return res
 
 
-def count_values_of(key, collection_obj, pre_operators=(), verbose=False):
+def key_value_counts(key, collection_obj, pre_operators=(), verbose=False):
     """Counting all possible values of a given key in a collection."""
     if verbose:
         print('\nCounting values of key {} in collection {}.'.format(
@@ -54,15 +54,8 @@ def count_values_of(key, collection_obj, pre_operators=(), verbose=False):
         {'$sort': {'total': -1}},
     ])
     res = {doc['_id']: doc['total'] for doc in cur}
-    total = sum(res.values())
-    return res, total
-
-
-def count_key_values_for_user(key, user_id, collection_obj):
-    """Return counts of unique values of the key in the given collection in all
-    documents belonging to the user with the given id."""
-    match = {'$match': {collection_obj.user_id: user_id}}
-    return count_values_of(key, collection_obj, [match])[0]
+    return OrderedDict(sorted(
+        res.items(), key=lambda item: item[1], reverse=True))
 
 
 def get_distinct_vals_for_key(key, collection_obj, matchop=None):
@@ -85,13 +78,6 @@ def get_distinct_vals_for_nested_key(key, subkey, collection, matchop=None):
     if matchop is None:
         matchop = mongozen.matchop.all_matchop()
     return get_distinct_vals_for_key(key+'.'+subkey, collection, matchop)
-
-
-def get_key_mode_for_user(key, user_id, collection_obj):
-    """Returns the mode of the key in the given collection in all documents
-    belonging to the user with the given id."""
-    res = count_key_values_for_user(key, user_id, collection_obj)
-    return get_key_of_max(res)
 
 
 # ==== visualizations ====
@@ -126,7 +112,8 @@ def display_keys_counts_in(keys_list, collection_obj):
 def display_key_values_dist_in(key, collection_obj, pre_operators=()):
     """Displays the values distribution for a specific key in a mongo
     collection."""
-    res, total = count_values_of(key, collection_obj, pre_operators)
+    res = key_value_counts(key, collection_obj, pre_operators)
+    total = sum(res.values())
     table = get_pretty_frequency_table('Value', res, total)
     print(table)
 

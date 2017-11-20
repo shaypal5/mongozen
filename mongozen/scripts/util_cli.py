@@ -1,5 +1,7 @@
 """A simple command-line tool for mongozen."""
 
+import pprint
+
 import click
 
 from mongozen.param_inference_maps import rebuild_all_maps
@@ -20,7 +22,7 @@ def rebuildmaps():
 
 
 @util.command(help="Rebuild collection attributes.")
-def rebuildattributes():
+def rebuildattr():
     """Rebuild collection attributes."""
     rebuild_collection_cfg_files()
 
@@ -28,4 +30,4 @@ def rebuildattributes():
 @util.command(help="Print mongozen's current configuration.")
 def printcfg():
     """Print mongozen's current configuration."""
-    print(_mongozen_cfg())
+    pprint.pprint(_mongozen_cfg(), indent=1, width=10)

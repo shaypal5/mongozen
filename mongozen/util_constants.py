@@ -6,9 +6,12 @@ import os
 HOMEDIR = os.path.expanduser("~")
 MONGOZEN_DIR_NAME = '.mongozen'
 MONGOZEN_DIR_PATH = os.path.join(HOMEDIR, MONGOZEN_DIR_NAME)
+os.makedirs(MONGOZEN_DIR_PATH, exist_ok=True)
 
 DATA_DIR_NAME = 'data'
 DATA_DIR_PATH = os.path.join(MONGOZEN_DIR_PATH, DATA_DIR_NAME)
+os.makedirs(DATA_DIR_PATH, exist_ok=True)
+
 
 MONGO_CRED_FNAME = 'mongozen_credentials.yml'
 MONGO_CRED_FPATH = os.path.abspath(os.path.join(

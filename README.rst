@@ -73,7 +73,7 @@ You can print the current configuration your ``mongozen`` installation uses to t
 
 .. code-block:: bash
 
-  mongozen print-cfg
+  mongozen util printcfg
 
 
 Credentials file
@@ -111,10 +111,17 @@ For example:
 
 .. code-block:: python
 
+  env_priority:
+    - staging
+    - local
+    - production
   server_priority:
-      - staging
-      - local
-      - production
+    production:
+      - user_data
+      - system_data
+    staging:
+      - system_data
+      - user_data
   infer_parameters: True
 
 
@@ -201,7 +208,7 @@ This attribute files need to be built (or rebuilt, on changes) using:
 
 .. code-block:: bash
 
-  mongozen rebuild-attributes
+  mongozen util rebuildattr
 
 
 Matchop
@@ -295,7 +302,7 @@ See the above `Configuration`_ section for further details on how to configure `
 
 .. code-block:: bash
 
-  mongozen rebuild-maps
+  mongozen util rebuildmaps
 
  If new databases and collections are added these maps become outdated, and might infere parameters incorrectly. If you encounter this problem, run the command again.
 

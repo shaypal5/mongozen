@@ -175,10 +175,76 @@ def _server_list(env_name):
         return servers
 
 
+def get_bad_db_terms():
+    """Returns a list of bad DB terms."""
+    try:
+        return _mongozen_cfg()[CfgKey.BAD_DB_TERMS.value]
+    except KeyError:
+        return []
+
+
+def get_bad_col_names():
+    """Returns a list of bad DB terms."""
+    try:
+        return _mongozen_cfg()[CfgKey.BAD_COL_NAMES.value]
+    except KeyError:
+        return []
+
+
+def get_env_list():
+    """Returns a list of defined environments."""
+    try:
+        return list(_mongozen_cfg()[CfgKey.ENVS.value].keys())
+    except KeyError:
+        return []
+
+
+def get_server_list(env):
+    """Returns a list of defined servers for the given environment."""
+    try:
+        return [
+            srv for srv in _mongozen_cfg()[CfgKey.ENVS.value][env].keys()
+            if srv != CfgKey.MONGOZEN_ENV_PARAMS.value
+        ]
+    except KeyError:
+        return []
+
+def get_host_list(env, server):
+    try:
+        return _mongozen_cfg()[CfgKey.ENVS.value][env][server]['host']
+    except KeyError:
+        return []
+
+
+# ==== Utility Methods ====
+
+@lru_cache(maxsize=2)
+def _get_host_to_server_map():
+    host_to_server_map = {}
+    cfg = _mongozen_cfg()
+    for env in get_env_list():
+        for server in get_server_list(env):
+            for host in get_host_list(env, server):
+                host_to_server_map[host] = server
+    return host_to_server_map
+
+
+@lru_cache(maxsize=2)
+def _get_host_to_env_map():
+    host_to_env_map = {}
+    cfg = _mongozen_cfg()
+    for env in get_env_list():
+        for server in get_server_list(env):
+            for host in get_host_list(env, server):
+                host_to_env_map[host] = env
+    return host_to_env_map
+
+
 # ==== parameter inference maps ====
 
 MAP_DIR_NAME = 'param_inference_maps'
 MAP_DIR_PATH = os.path.abspath(os.path.join(DATA_DIR_PATH, MAP_DIR_NAME))
+os.makedirs(MAP_DIR_PATH, exist_ok=True)
 
 
 def _get_map_fpath(map_enum):
@@ -187,7 +253,7 @@ def _get_map_fpath(map_enum):
 
 def _save_map(mab_obj, map_enum):
     map_fpath = _get_map_fpath(map_enum)
-    with open(map_fpath, 'w') as map_file:
+    with open(map_fpath, 'w+') as map_file:
         yaml.dump(mab_obj, map_file)
 
 
@@ -198,7 +264,7 @@ def _get_map(map_enum):
         return yaml.load(map_file)
 
 
-class Map(Enum):
+class ParamInferMap(Enum):
     """Names of maps used for parameter inference."""
     DB_TO_ENV = 'db_to_env_map'
     DB_N_SERVER_TO_ENV = 'db_n_server_to_env_map'
