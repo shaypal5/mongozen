@@ -16,7 +16,7 @@ from .util_constants import (
     MONGO_CRED_FPATH,
     ACCESS_MODES,
     PERSONAL_MONGO_CFG_FPATH,
-    DATA_DIR_PATH
+    DATA_DIR_PATH,
 )
 
 
@@ -34,6 +34,7 @@ class CfgKey(Enum):
     SERVER_PRIORITY = 'server_priority'
     BAD_DB_TERMS = 'bad_db_terms'
     BAD_COL_NAMES = 'bad_collection_names'
+
 
 DEFAULT_CFG = {
     CfgKey.INFER_PARAM: False,
@@ -84,19 +85,31 @@ def _mongozen_cfg():
         return DEFAULT_CFG
 
 
+def _host_list_from_server_cfg(server_cfg):
+    try:
+        host_param = server_cfg['host']
+        if isinstance(host_param, str):
+            return [host_param]
+        return host_param
+    except KeyError:
+        return []
+
+
+def _host_str_from_server_cfg(server_cfg):
+    return ','.join(_host_list_from_server_cfg(server_cfg))
+
+
 def _build_mongo_uri(server_cfg, mode_cred):
-    return [
-        'mongodb://{user}:{pswd}@{host}:{port}'.format(
-            user=mode_cred['username'],
-            pswd=quote(mode_cred['password']),
-            host=hostname,
-            port=server_cfg['port']
-        ) for hostname in server_cfg['host']
-    ]
+    return 'mongodb://{user}:{pswd}@{host}'.format(
+        user=mode_cred['username'],
+        pswd=quote(mode_cred['password']),
+        host=_host_str_from_server_cfg(server_cfg)
+    )
 
 
 MISSING_CRED_ERROR_MSG = "Missing mongozen credentials for {} from/to {}.{}!" \
                          " Please see the documentation."
+
 
 @lru_cache(maxsize=128)
 def _get_server_cfg(server_name, env_name, mode='reading'):
@@ -112,7 +125,7 @@ def _get_server_cfg(server_name, env_name, mode='reading'):
         traceback.print_stack()
         raise ValueError(
             "Bad env or server name: env={}, server={}. ".format(
-                env_name, server_name) + \
+                    env_name, server_name),
             "Found cfg={}. Found cred={}".format(cfg, cred))
 
     try:
@@ -123,7 +136,7 @@ def _get_server_cfg(server_name, env_name, mode='reading'):
                 mode, env_name, server_name
             ))
         raise ValueError(
-            "Bad mode name: {}. Found cfg={}. Found cred={}".format(
+            "Bad access mode name: {}. Found cfg={}. Found cred={}".format(
                 mode, cfg, cred))
     except TypeError:
         raise Exception(MISSING_CRED_ERROR_MSG.format(
@@ -143,17 +156,26 @@ def _get_server_cfg(server_name, env_name, mode='reading'):
 
 @lru_cache(maxsize=2)
 def _env_list():
+    """Returns a list of defined environments in order of increasing priority.
+    """
     try:
+        envs = _mongozen_cfg()[CfgKey.ENVS]
         env_priority = _mongozen_cfg()[CfgKey.ENV_PRIORITY.value].copy()
-        env_priority.reverse()
+        final_priority = env_priority.copy() + [
+            x for x in envs if x not in env_priority]
+        final_priority.reverse()
         envs = [
-            env for env in env_priority
+            env for env in final_priority
             if env in _get_mongo_cred()
         ]
         return envs
     except (KeyError, TypeError):
         envs = list(_get_mongo_cred().keys())
         envs.reverse()
+        envs = [
+            env for env in envs
+            if env in _get_mongo_cred()
+        ]
         return envs
 
 
@@ -175,10 +197,76 @@ def _server_list(env_name):
         return servers
 
 
+def get_bad_db_terms():
+    """Returns a list of bad DB terms."""
+    try:
+        return _mongozen_cfg()[CfgKey.BAD_DB_TERMS.value]
+    except KeyError:
+        return []
+
+
+def get_bad_col_names():
+    """Returns a list of bad DB terms."""
+    try:
+        return _mongozen_cfg()[CfgKey.BAD_COL_NAMES.value]
+    except KeyError:
+        return []
+
+
+def get_env_list():
+    """Returns a list of defined environments."""
+    try:
+        return list(_mongozen_cfg()[CfgKey.ENVS.value].keys())
+    except KeyError:
+        return []
+
+
+def get_server_list(env):
+    """Returns a list of defined servers for the given environment."""
+    try:
+        return [
+            srv for srv in _mongozen_cfg()[CfgKey.ENVS.value][env].keys()
+            if srv != CfgKey.MONGOZEN_ENV_PARAMS.value
+        ]
+    except KeyError:
+        return []
+
+
+def get_host_string(env, server):
+    try:
+        server_cfg = _mongozen_cfg()[CfgKey.ENVS.value][env][server]
+        return _host_str_from_server_cfg(server_cfg)
+    except KeyError:
+        return ''
+
+
+# ==== Utility Methods ====
+
+@lru_cache(maxsize=2)
+def _get_host_to_server_map():
+    host_to_server_map = {}
+    for env in get_env_list():
+        for server in get_server_list(env):
+            host_str = get_host_string(env, server)
+            host_to_server_map[host_str] = server
+    return host_to_server_map
+
+
+@lru_cache(maxsize=2)
+def _get_host_to_env_map():
+    host_to_env_map = {}
+    for env in get_env_list():
+        for server in get_server_list(env):
+            host_str = get_host_string(env, server)
+            host_to_env_map[host_str] = env
+    return host_to_env_map
+
+
 # ==== parameter inference maps ====
 
 MAP_DIR_NAME = 'param_inference_maps'
 MAP_DIR_PATH = os.path.abspath(os.path.join(DATA_DIR_PATH, MAP_DIR_NAME))
+os.makedirs(MAP_DIR_PATH, exist_ok=True)
 
 
 def _get_map_fpath(map_enum):
@@ -187,7 +275,7 @@ def _get_map_fpath(map_enum):
 
 def _save_map(mab_obj, map_enum):
     map_fpath = _get_map_fpath(map_enum)
-    with open(map_fpath, 'w') as map_file:
+    with open(map_fpath, 'w+') as map_file:
         yaml.dump(mab_obj, map_file)
 
 
@@ -198,7 +286,7 @@ def _get_map(map_enum):
         return yaml.load(map_file)
 
 
-class Map(Enum):
+class ParamInferMap(Enum):
     """Names of maps used for parameter inference."""
     DB_TO_ENV = 'db_to_env_map'
     DB_N_SERVER_TO_ENV = 'db_n_server_to_env_map'

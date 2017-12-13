@@ -1,6 +1,5 @@
 language: python
 python:
-- '3.4'
 - '3.5'
 - '3.6'
 # notifications:
@@ -11,6 +10,10 @@ before_install:
   - pip install codecov
 install:
   - pip install ".[test]"
+before_script:
+  - mkdir ~/.mongozen
+  - openssl aes-256-cbc -K $encrypted_92cac7702d5e_key -iv $encrypted_92cac7702d5e_iv -in ./ci/mongozen_cfg.yml.enc -out ~/.mongozen/mongozen_cfg.yml -d
+  -  openssl aes-256-cbc -K $encrypted_04546b6a1e1b_key -iv $encrypted_04546b6a1e1b_iv -in ./ci/mongozen_credentials.yml.enc -out ~/.mongozen/mongozen_credentials.yml -d
 script: pytest --cov=mongozen
 after_success:
   - codecov

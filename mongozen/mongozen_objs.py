@@ -4,7 +4,7 @@ import os
 try:  # for automatic caching of return values of functions
     from functools import lru_cache
 except ImportError:
-    from functools32 import lru_cache  # pylint: disable=E0401
+    from functools32 import lru_cache  # noqa: F401
 try:
     import cPickle as pickle  # for python 2
 except ImportError:
@@ -22,8 +22,11 @@ from utilp.classes import (
 )
 from .shared import (
     DATA_DIR_PATH,
-    CfgKey,
-    _mongozen_cfg
+    _get_server_cfg,
+    get_bad_db_terms,
+    get_bad_col_names,
+    _get_host_to_server_map,
+    _get_host_to_env_map,
 )
 
 COLLECTION_CFG_DIR_NAME = 'collection_cfg'
@@ -40,30 +43,6 @@ SHARED_CFG_FOLDER_PATH = os.path.abspath(
         SHARED_CFG_FOLDER_NAME
     )
 )
-
-
-# ==== Utility Methods ====
-
-@lru_cache(maxsize=2)
-def _get_host_to_server_map():
-    host_to_server_map = {}
-    cfg = _mongozen_cfg()
-    for env in cfg[CfgKey.ENVS.value]:
-        for server in cfg[CfgKey.ENVS.value][env]:
-            for host in cfg[CfgKey.ENVS.value][env][server]['host']:
-                host_to_server_map[host] = server
-    return host_to_server_map
-
-
-@lru_cache(maxsize=2)
-def _get_host_to_env_map():
-    host_to_env_map = {}
-    cfg = _mongozen_cfg()
-    for env in cfg[CfgKey.ENVS.value]:
-        for server in cfg[CfgKey.ENVS.value][env]:
-            for host in cfg[CfgKey.ENVS.value][env][server]['host']:
-                host_to_env_map[host] = env
-    return host_to_env_map
 
 
 # ==== Classes Definitions ====
@@ -83,23 +62,16 @@ class MongozenClient(MongoClient, metaclass=InheritableDocstrings):
         super().__init__(*args, **kwargs)
         try:
             host = kwargs['host']
+            host = host[host.rfind('@')+1:]
         except KeyError:
-            if args:
-                host = args[0]
-            else:
-                host = None
-        try:
-            if not isinstance(host, str):
-                host = host[0]
-            host = host[host.rfind('@')+1:host.rfind(':')]
-        except (TypeError, AttributeError):
-            raise TypeError("Host must be a string or list of strings")
+            raise ValueError("A host value must be provided for every server"
+                             "configured for mongozen.")
         self.server = _get_host_to_server_map()[host]
         self.env = _get_host_to_env_map()[host]
         cfg = self._get_server_cfg()
         dbs_to_init = [
             db for db in cfg
-            if db not in _mongozen_cfg()[CfgKey.BAD_DB_TERMS.value]
+            if db not in get_bad_db_terms()
         ]
         for db_name in dbs_to_init:
             setattr(self, db_name, self[db_name])
@@ -121,8 +93,6 @@ class MongozenClient(MongoClient, metaclass=InheritableDocstrings):
                      write_concern=None, read_concern=None):
         return MongozenDatabase(self, name, codec_options, read_preference,
                                 write_concern, read_concern)
-
-
 
     def _get_env_cfg_folder_path(self, env_name):
         return os.path.abspath(
@@ -170,10 +140,16 @@ class MongozenDatabase(Database, metaclass=InheritableDocstrings):
         cfg = self._get_db_cfg()
         cols_to_init = [
             col for col in cfg
-            if col not in _mongozen_cfg()[CfgKey.BAD_COL_NAMES.value]
+            if col not in get_bad_col_names()
         ]
         for col_name in cols_to_init:
-            setattr(self, col_name, self[col_name])
+            try:
+                setattr(self, col_name, self[col_name])
+            except AttributeError:
+                pass
+                # print("Attribute for collection {} was not set for"
+                #       " db object.".format(col_name))
+                # self = self.replace(**{col_name: self[col_name]})
 
     @copy_ancestor_docstring
     def get_collection(self, name, codec_options=None, read_preference=None,
@@ -227,6 +203,23 @@ class MongozenDatabase(Database, metaclass=InheritableDocstrings):
                 return yaml.load(db_cfg_file)
         except FileNotFoundError:
             return {}
+
+    # MongoDB connection string pattern:
+    # mongodb://[username:password@]host1[:port1][,host2[:port2],
+    # ...[,hostN[:portN]]][/[database][?options]]
+
+    # Example: mongodb://db1.example.net:27017,db2.example.net:2500
+    # /?replicaSet=test&connectTimeoutMS=300000
+
+    def mongodb_connection_string(self):
+        server_cfg = _get_server_cfg(
+            server_name=self.client.server,
+            env_name=self.client.env,
+        ).copy()
+        con_str = server_cfg.pop('host')[0] + '/' + self.name + '?'
+        con_str += '&'.join([
+            '{}={}'.format(key, server_cfg[key]) for key in server_cfg])
+        return con_str
 
 
 class MongozenCollection(Collection, metaclass=InheritableDocstrings):

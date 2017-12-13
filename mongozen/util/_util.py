@@ -5,19 +5,26 @@ import os  # for path handling
 from shutil import rmtree  # for deleting directories
 from ntpath import basename  # for OS-agnostic file-name extraction from path
 import numbers  # to check for number types
+import csv
+from json import JSONDecodeError
+import copy  # for deepcopy-ing dicts
 
 import numpy as np
 import bson
 import utilitime
+from strct.dicts import flatten_dict
+from bson.json_util import (
+    dumps,
+    loads,
+)
 
-from ..core import get_collection
 from ..shared import (
     CfgKey,
     _mongozen_cfg,
+    _get_server_cfg,
     _get_mongo_cred
 )
 from ..util_constants import HOMEDIR
-
 
 # ======= module-specific constants ======
 
@@ -25,8 +32,6 @@ NUM_BYTES_IN_MB = 1048576
 MONGODB_DOC_SIZE_LIMIT_IN_MEGABYTES = 16
 MONGODB_DOC_SIZE_LIMIT_IN_BYTES = \
     (MONGODB_DOC_SIZE_LIMIT_IN_MEGABYTES * NUM_BYTES_IN_MB) - 1024
-MONGODB_DOC_SAFE_SIZE_LIMIT_IN_BYTES = \
-    MONGODB_DOC_SIZE_LIMIT_IN_BYTES - (50*1024)
 
 
 # ======= utility methods ======
@@ -68,42 +73,58 @@ def document_is_not_too_big(document):
         return False
 
 
-def document_is_strictly_not_too_big(document):
-    """Returns True if the given documents can be encoded to BSON and the
-    result is significantly under the MongoDB size limit of 16MB.
+def _strictify(some_object):
+    if isinstance(some_object, dict):
+        new_dict = copy.deepcopy(some_object)
+        for key, value in some_object.items():
+            new_dict[key] = _strictify(value)
+        return new_dict
+    if isinstance(some_object, (tuple, list)):
+        new_list = []
+        for item in some_object:
+            new_list.append(_strictify(item))
+        return new_list
+    if isinstance(some_object, bson.objectid.ObjectId):
+        return {"$oid": str(some_object)}
 
-    Arguments
-    ---------
-    document : dict
-        A python dict object to be encoded as a BSON document.
+
+def strictify_query(query_dict):
+    """Converts a query dict into the MongoDB defined strict mode JSON.
+
+    See: https://docs.mongodb.com/manual/reference/mongodb-extended-json/
+
+    Parameters
+    ----------
+    query_dict : dict
+        A dict representing a MongoDB query.
 
     Returns
     -------
-    boolean
-        True if the given documents can be encoded to BSON and the result is
-        under the MongoDB size limit of 16MB.
+    dict
+        A corresponding query dict with values converted to approriate strict
+        mode JSON representations.
     """
-    try:
-        return bson_doc_bytesize(document) < MONGODB_DOC_SIZE_LIMIT_IN_BYTES
-    except bson.errors.InvalidDocument:
-        return False
+    return _strictify(query_dict)
 
 
 def parse_value_for_mongo(value):
     """Parse the given value, which might also be a structure like a dict or a
-    list, into a format that can be written to mongodb."""
+    list, into a format that can be written to mongodb.
+
+    This method handles some common numpy data types and generic iterables. It
+    also replaces dots in key strings with hyphens, as to prevent unintentional
+    nesting.
+    """
     newval = 'DefaultValue'
     if isinstance(value, np.ndarray):
         newval = value.tolist()
     elif isinstance(value, dict):
         newval = {}
         for k, v in value.items():
-            newval[parse_value_for_mongo(k)] = parse_value_for_mongo(v)
-    elif isinstance(value, str):
-        if '.' in value:
-            newval = value.replace('.', '-')
-        else:
-            newval = value
+            key = parse_value_for_mongo(k)
+            if isinstance(key, str) and '.' in key:
+                key = key.replace('.', '-')
+            newval[key] = parse_value_for_mongo(v)
     elif hasattr(value, '__iter__') and not isinstance(value, str):
         newval = []
         for element in value:
@@ -202,50 +223,92 @@ def timestamp_range_to_objectid_range(from_timestamp, to_timestgamp):
 
 # ==== Collection dump and restore
 
-MONGOTEMP_CMD = "{cmd} --host {{host}} --port {{port}} --username {{usr}} " \
-                "--password {{pwd}} --authenticationDatabase admin " \
-                "--db {{db}} {collection} " \
-                " {dir_flag} {{dir_path}} {{verbosity}}"
 
-CMD_MSG = "{action} {collection} in database={{db}}, server={{server}} and "\
-        "environment={{env}}, {direction} directory {{dir}}"
+def _exec_cmd(cmd):
+    popen = subprocess.Popen(
+        cmd.split(), stdout=subprocess.PIPE, universal_newlines=True)
+    for stdout_line in iter(popen.stdout.readline, ""):
+        print(stdout_line, end="")
+    popen.stdout.close()
+    return_code = popen.wait()
+    if return_code:
+        raise subprocess.CalledProcessError(return_code, cmd)
 
-def _mongo_cmd(command, msg, db_obj, dir_path, mode, verbose):
+
+MONGOTEMP_CMD = (
+    '{cmd} --host="{host}" --username="{usr}" --password="{pwd}" --db="{db}"'
+    ' {authdb} {readpreference} {verbosity}'
+)
+
+
+CMD_MSG = "{msg} for database={db}, server={server} and environment={env}"
+
+
+def _mongo_cmd(cmd, msg, db_obj, mode, verbose=None):
+    """
+    verbose : bool, optional
+        Is true, prints information to terminal and requests for confirmation.
+    """
+    if verbose is None:
+        verbose = True
     db_name = db_obj.name
     server_name = db_obj.client.server
     env_name = db_obj.client.env
     if verbose:
-        print(msg.format(db=db_name, server=server_name, env=env_name,
-                         dir=dir_path))
+        print(CMD_MSG.format(msg=msg, db=db_name, server=server_name,
+                             env=env_name))
         response = input("Please confirm by typing 'y': ")
         if response != 'y':
             return
+    server_cfg = _get_server_cfg(server_name, env_name, mode='reading')
     server_config = _mongozen_cfg()[CfgKey.ENVS.value][env_name][server_name]
     server_cred = _get_mongo_cred()[env_name][server_name][mode]
-    host_str = server_config['host'][0]
-    for host_name in server_config['host'][1:]:
-        host_str = host_str + "," + host_name
+    try:
+        repl_set = server_cfg['replicaSet']
+    except KeyError:
+        repl_set = ''
+    host_str = repl_set + '/' + ','.join(server_config['host'])
+    try:
+        authdb = '--authenticationDatabase="{}"'.format(
+            server_cfg['authSource'])
+    except KeyError:
+        authdb = ''
+    try:
+        readpref = '--readPreference="{}"'.format(server_cfg['readPreference'])
+    except KeyError:
+        readpref = ''
     verbosity_flag = '--quiet'
     if verbose:
-        verbosity_flag = '-vvvvv'
-    mongo_cmd = command.format(
+        verbosity_flag = '-v'
+    mongo_cmd = MONGOTEMP_CMD.format(
+        cmd=cmd,
         host=host_str,
-        port=server_config['port'],
         usr=server_cred['username'],
         pwd=server_cred['password'],
         db=db_name,
-        dir_path=dir_path,
+        authdb=authdb,
+        readpreference=readpref,
         verbosity=verbosity_flag
     )
-    process = subprocess.Popen(mongo_cmd.split(), stdout=subprocess.PIPE)
-    output, error = process.communicate()
-    if verbose:
-        print('Command was ran.')
-        print('Output: {}'.format(output))
-        print('Error: {}'.format(error))
+    # process = subprocess.Popen(mongo_cmd.split(), stdout=subprocess.PIPE)
+    try:
+        # _exec_cmd(mongo_cmd)
+        output = subprocess.check_output(
+            mongo_cmd, stderr=subprocess.STDOUT, shell=True,
+            universal_newlines=True)
+    except subprocess.CalledProcessError as exc:
+        print("Status : FAIL", exc.returncode, exc.output)
+    else:
+        if verbose:
+            print("Output: \n{}\n".format(output))
+    finally:
+        if verbose:
+            print('Command was ran.')
+            print('Command:\n{}'.format(mongo_cmd))
 
 
-def dump_collection(source_collection, output_dir_path, verbose=True):
+def dump_collection(source_collection, output_dir_path, query=None,
+                    verbose=True):
     """Dumps the contents of the given source collection to the directory in
     the given path.
 
@@ -305,8 +368,64 @@ def restore_collection(target_db, input_file_path, verbose=True):
         input_file_path, 'writing', verbose)
 
 
+EXPORT_CMD = "mongoexport {fields} {query} {type}"
+
+
+def export_collection(collection, output_fpath, fields=None, query=None,
+                      type=None, escape_dollar=None, verbose=None):
+    """Exports the contents of the given collection to a file.
+
+    Parameters
+    ----------
+    collection : mongozen.mongozen_objs.MongozenCollection
+        The collection whose contents will be exported.
+    output_fpath : str
+        The full path to the desired output file.
+    fields : list, optional
+        Specifies fields to include in the export.
+    query : dict, optional
+        Provides a JSON document as a query that optionally limits the
+        documents returned in the export. Specify JSON in strict format. Only
+        single quotes can be used in this query document.
+    type : string, optional
+        Specifies the file type to export. Specify 'csv' for CSV format or
+        'json' for JSON format. Defaults to 'json'.
+    escape_dollar : bool, optional
+        Whether to escape dollar sign in the query string (required in most
+        common shells). Defaults to True.
+    verbose: bool, optional
+        Whether to print messages during the operation. Defaults to True.
+    """
+    if type is None:
+        type = 'csv'
+    if escape_dollar is None:
+        escape_dollar = True
+    if '~' in output_fpath:
+        output_fpath = os.path.expanduser(output_fpath)
+    cmd = 'mongoexport --collection="{}" --out="{}"'.format(
+        collection.name, output_fpath)
+    msg = "Exporting collection {} to {}".format(collection.name, output_fpath)
+    if fields:
+        cmd += ' --fields="{}"'.format(','.join(fields))
+        msg += ", limiting to fields {}".format(fields)
+    if query:
+        msg += ", with query {},".format(query)
+        query = strictify_query(query)
+        query = "{}".format(query)
+        query = query.replace(" ", "")
+        if escape_dollar:
+            query = query.replace("$", "\$")
+        cmd += ' --query="{}"'.format(query)
+    if type:
+        cmd += ' --type="{}"'.format(type)
+        msg += " with {} file type,".format(type)
+    _mongo_cmd(cmd=cmd, msg=msg, db_obj=collection.database, mode='reading',
+               verbose=verbose)
+
+
 DUMPS_DIR_NAME = '.mongozen_temp_dump'
 DUMPS_DIR_PATH = os.path.join(HOMEDIR, DUMPS_DIR_NAME)
+
 
 def copy_collection(source_collection, target_db, temp_dir_path=None,
                     verbose=True):
@@ -356,3 +475,87 @@ def copy_collection(source_collection, target_db, temp_dir_path=None,
     rmtree(temp_dump_dir_path)
     if verbose:
         print("Collection copy operation done.")
+
+
+def dump_document_cursor_to_csv(doc_cursor, file_path, fieldnames=None,
+                                missing_val=None, flatten=False):
+    """Writes documents in a pymongo cursor into a csv file.
+
+    Documents are dumped in the order they are returned from the cursor.
+
+    Arguments
+    ---------
+    doc_cursor : pymongo.cursor.Cursor
+        A pymongo document cursor returned by commands like find or aggregate.
+    file_path : str
+        The full path of the file into which cursor documents are dumped.
+    fieldnames : sequence, optional
+        The list of field names used as headers of the resulting csv file. If
+        not given, the lexicographically-sorted field names of the first
+        document in the cursor are used. Fields only found in subsequent
+        documents will be ignored, while fields missing in subsequent documents
+        will be filled with the given missing value string parameter.
+    missing_val : str, optional
+        The value used to fill missing fields in documents. Defaults to "NA".
+    flatten : bool, optional
+        If set to True, documents are flattened to dicts of depth one before
+        writing them to file. Defaults to False.
+    """
+    def doc_trans(doc): return doc
+    if missing_val is None:
+        missing_val = "NA"
+    if flatten:
+        def doc_trans(doc): return flatten_dict(  # noqa: F811
+            dict_obj=doc, separator='.', flatten_lists=True)
+    first_doc = None
+    if fieldnames is None:
+        first_doc = doc_cursor.next()
+        fieldnames = sorted(list(doc_trans(first_doc).keys()))
+    with open(file_path, 'w+') as file_obj:
+        writer = csv.DictWriter(file_obj, fieldnames, restval=missing_val,
+                                extrasaction='ignore', dialect='excel')
+        writer.writeheader()
+        if first_doc:
+            writer.writerow(doc_trans(first_doc))
+            print(doc_trans(first_doc))
+        for document in doc_cursor:
+            writer.writerow(doc_trans(document))
+
+
+def dump_document_cursor_to_json(doc_cursor, file_path):
+    """Writes documents in a pymongo cursor into a json file.
+
+    Arguments
+    ---------
+    doc_cursor : pymongo.cursor.Cursor
+        A pymongo document cursor returned by commands like find or aggregate.
+    file_path : str
+        The full path of the file into which cursor documents are dumped.
+    """
+    with open(file_path, 'w+') as dump_json:
+        dump_json.write('[\n')
+        dump_json.write(dumps(doc_cursor.next()))
+        for doc in doc_cursor:
+            dump_json.write(',\n')
+            dump_json.write(dumps(doc))
+        dump_json.write('\n]')
+
+
+def load_document_iterator_from_json(file_path):
+    """Creates a lazy iterator over documents from a json file.
+
+    Arguments
+    ---------
+    file_path : str
+        The full path of the file from which documents are read.
+    """
+    with open(file_path, 'r') as load_json:
+        line = load_json.readline()
+        while line:
+            if line not in ('[\n', ']'):  # ignore start and end of array
+                try:  # skip trailing , and one \n
+                    yield loads(line[:-2])
+                except JSONDecodeError:  # last line has no , so just \n
+                    yield loads(line[:-1])
+            line = load_json.readline()
+        raise StopIteration

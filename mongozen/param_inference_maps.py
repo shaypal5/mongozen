@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from .shared import (
     _save_map,
-    Map,
+    ParamInferMap,
     _env_list,
     _server_list
 )
@@ -72,15 +72,15 @@ def rebuild_all_maps():
             except (ServerSelectionTimeoutError, OperationFailure):
                 print('mongozen: Connection to {} {} server failed while ' \
                       'rebuilding an inference map.'.format(env, serv))
-    # get_db maps
-    _save_map(db2env, Map.DB_TO_ENV)
-    _save_map(dbserv2env, Map.DB_N_SERVER_TO_ENV)
-    _save_map(dbenv2serv, Map.DB_N_ENV_TO_SERVER)
-    # get_collection maps
-    _save_map(col2env, Map.COL_2_ENV)
-    _save_map(coldb2env, Map.COL_N_DB_2_ENV)
-    _save_map(colserv2env, Map.COL_N_SERVER_2_ENV)
-    _save_map(coldbserv2env, Map.COL_N_DB_N_SERVER_2_ENV)
-    _save_map(colenv2serv, Map.COL_N_ENV_2_SERVER)
-    _save_map(coldbenv2serv, Map.COL_N_DB_N_ENV_2_SERVER)
-    _save_map(colservenv2db, Map.COL_N_SERVER_N_ENV_2_DB)
+    # save get_db maps
+    _save_map(db2env, ParamInferMap.DB_TO_ENV)
+    _save_map(dbserv2env, ParamInferMap.DB_N_SERVER_TO_ENV)
+    _save_map(dbenv2serv, ParamInferMap.DB_N_ENV_TO_SERVER)
+    # save get_collection maps
+    _save_map(col2env, ParamInferMap.COL_2_ENV)
+    _save_map(coldb2env, ParamInferMap.COL_N_DB_2_ENV)
+    _save_map(colserv2env, ParamInferMap.COL_N_SERVER_2_ENV)
+    _save_map(coldbserv2env, ParamInferMap.COL_N_DB_N_SERVER_2_ENV)
+    _save_map(colenv2serv, ParamInferMap.COL_N_ENV_2_SERVER)
+    _save_map(coldbenv2serv, ParamInferMap.COL_N_DB_N_ENV_2_SERVER)
+    _save_map(colservenv2db, ParamInferMap.COL_N_SERVER_N_ENV_2_DB)

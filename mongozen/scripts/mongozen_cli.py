@@ -2,7 +2,6 @@
 
 import click
 
-from .queries_cli import queries
 from .util_cli import util
 
 
@@ -12,5 +11,4 @@ def cli():
     pass
 
 
-cli.add_command(queries)
 cli.add_command(util)
