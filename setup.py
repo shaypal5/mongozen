@@ -37,7 +37,7 @@ setuptools.setup(
     ''',
     install_requires=[
         'pymongo>=3.4', 'pyyaml', 'pytz', 'tqdm', 'click', 'numpy',
-        'decore', 'comath>=0.0.3', 'strct>=0.0.14', 'utilpi>=0.0.7',
+        'decore', 'comath>=0.0.3', 'strct>=0.0.14', 'utilp>=0.0.7',
         'utilitime>=0.0.3', 'prettytable'
     ],
     extras_require={
