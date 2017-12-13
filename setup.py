@@ -37,7 +37,7 @@ setuptools.setup(
     ''',
     install_requires=[
         'pymongo>=3.4', 'pyyaml', 'pytz', 'tqdm', 'click', 'numpy',
-        'decore', 'comath', 'strct', 'utilitime', 'prettytable'
+        'decore', 'comath', 'strct', 'utilp', 'utilitime', 'prettytable'
     ],
     extras_require={
         'test': TEST_REQUIRES,
