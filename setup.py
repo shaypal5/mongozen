@@ -1,6 +1,6 @@
 """Setup for the mongozen package."""
 
-#!/usr/bin/env python
+# !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 import sys
@@ -32,7 +32,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     include_package_data=True,
     entry_points='''
-        [console_scripts]
+    [console_scripts]
         mongozen=mongozen.scripts.mongozen_cli:cli
     ''',
     install_requires=[
@@ -41,5 +41,19 @@ setuptools.setup(
     ],
     extras_require={
         'test': TEST_REQUIRES,
-    }
+    },
+    platforms=['any'],
+    keywords='mongodb',
+    classifiers=[
+        # Trove classifiers
+        # (https://pypi.python.org/pypi?%3Aaction=list_classifiers)
+        'Development Status :: 4 - Beta',
+        'License :: OSI Approved :: MIT License',
+        'Programming Language :: Python',
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
+        'Topic :: Software Development :: Libraries',
+        'Topic :: Software Development :: Libraries :: Python Modules',
+        'Intended Audience :: Developers',
+    ],
 )

@@ -72,11 +72,11 @@ def rebuild_all_maps():
             except (ServerSelectionTimeoutError, OperationFailure):
                 print('mongozen: Connection to {} {} server failed while ' \
                       'rebuilding an inference map.'.format(env, serv))
-    # get_db maps
+    # save get_db maps
     _save_map(db2env, ParamInferMap.DB_TO_ENV)
     _save_map(dbserv2env, ParamInferMap.DB_N_SERVER_TO_ENV)
     _save_map(dbenv2serv, ParamInferMap.DB_N_ENV_TO_SERVER)
-    # get_collection maps
+    # save get_collection maps
     _save_map(col2env, ParamInferMap.COL_2_ENV)
     _save_map(coldb2env, ParamInferMap.COL_N_DB_2_ENV)
     _save_map(colserv2env, ParamInferMap.COL_N_SERVER_2_ENV)
