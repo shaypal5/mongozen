@@ -409,12 +409,17 @@ def export_collection(collection, output_fpath, fields=None, query=None,
         cmd += ' --fields="{}"'.format(','.join(fields))
         msg += ", limiting to fields {}".format(fields)
     if query:
+        assert isinstance(query, dict)
         msg += ", with query {},".format(query)
         query = strictify_query(query)
+        assert isinstance(query, dict)
         query = "{}".format(query)
+        assert isinstance(query, str)
         query = query.replace(" ", "")
+        assert isinstance(query, str)
         if escape_dollar:
             query = query.replace("$", "\$")
+            assert isinstance(query, str)
         cmd += ' --query="{}"'.format(query)
     if type:
         cmd += ' --type="{}"'.format(type)
