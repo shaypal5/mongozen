@@ -372,7 +372,7 @@ EXPORT_CMD = "mongoexport {fields} {query} {type}"
 
 
 def export_collection(collection, output_fpath, fields=None, query=None,
-                      type=None, escape_dollar=None, verbose=None):
+                      ftype=None, escape_dollar=None, verbose=None):
     """Exports the contents of the given collection to a file.
 
     Parameters
@@ -387,7 +387,7 @@ def export_collection(collection, output_fpath, fields=None, query=None,
         Provides a JSON document as a query that optionally limits the
         documents returned in the export. Specify JSON in strict format. Only
         single quotes can be used in this query document.
-    type : string, optional
+    ftype : string, optional
         Specifies the file type to export. Specify 'csv' for CSV format or
         'json' for JSON format. Defaults to 'json'.
     escape_dollar : bool, optional
@@ -396,8 +396,9 @@ def export_collection(collection, output_fpath, fields=None, query=None,
     verbose: bool, optional
         Whether to print messages during the operation. Defaults to True.
     """
-    if type is None:
-        type = 'csv'
+    print(type(query))
+    if ftype is None:
+        ftype = 'csv'
     if escape_dollar is None:
         escape_dollar = True
     if '~' in output_fpath:
@@ -409,21 +410,17 @@ def export_collection(collection, output_fpath, fields=None, query=None,
         cmd += ' --fields="{}"'.format(','.join(fields))
         msg += ", limiting to fields {}".format(fields)
     if query:
-        assert isinstance(query, dict)
         msg += ", with query {},".format(query)
         query = strictify_query(query)
-        assert isinstance(query, dict)
         query = "{}".format(query)
-        assert isinstance(query, str)
         query = query.replace(" ", "")
-        assert isinstance(query, str)
         if escape_dollar:
             query = query.replace("$", "\$")
             assert isinstance(query, str)
         cmd += ' --query="{}"'.format(query)
-    if type:
-        cmd += ' --type="{}"'.format(type)
-        msg += " with {} file type,".format(type)
+    if ftype:
+        cmd += ' --type="{}"'.format(ftype)
+        msg += " with {} file type,".format(ftype)
     _mongo_cmd(cmd=cmd, msg=msg, db_obj=collection.database, mode='reading',
                verbose=verbose)
 
