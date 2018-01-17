@@ -86,6 +86,7 @@ def _strictify(some_object):
         return new_list
     if isinstance(some_object, bson.objectid.ObjectId):
         return {"$oid": str(some_object)}
+    return some_object
 
 
 def strictify_query(query_dict):
