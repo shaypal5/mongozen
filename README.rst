@@ -365,8 +365,8 @@ Created by Shay Palachy (shay.palachy@gmail.com).
 .. |Build-Status| image:: https://travis-ci.org/shaypal5/mongozen.svg?branch=master
   :target: https://travis-ci.org/shaypal5/mongozen
 
-.. |LICENCE| image:: https://img.shields.io/pypi/l/mongozen.svg
-  :target: https://pypi.python.org/pypi/mongozen
+.. |LICENCE| image:: https://img.shields.io/github/license/shaypal5/mongozen.svg
+  :target: https://github.com/shaypal5/mongozen/blob/master/LICENSE
 
 .. |Codecov| image:: https://codecov.io/github/shaypal5/mongozen/coverage.svg?branch=master
    :target: https://codecov.io/github/shaypal5/mongozen?branch=master
