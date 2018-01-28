@@ -245,22 +245,28 @@ MONGOTEMP_CMD = (
 CMD_MSG = "{msg} for database={db}, server={server} and environment={env}"
 
 
-def _mongo_cmd(cmd, msg, db_obj, mode, verbose=None):
+def _mongo_cmd(cmd, msg, db_obj, mode, verbose=None, auto=None):
     """
-    verbose : bool, optional
-        Is true, prints information to terminal and requests for confirmation.
+    verbose : bool, default True
+        If true, prints information to terminal and requests for confirmation.
+    auto : bool, default False
+        If true, does not ask for confirmation before running the command.
+        Otherwise, confirmation is asked if verbose is set to True.
     """
     if verbose is None:
         verbose = True
+    if auto is None:
+        verbose = False
     db_name = db_obj.name
     server_name = db_obj.client.server
     env_name = db_obj.client.env
     if verbose:
         print(CMD_MSG.format(msg=msg, db=db_name, server=server_name,
                              env=env_name))
-        response = input("Please confirm by typing 'y': ")
-        if response != 'y':
-            return
+        if not auto:
+            response = input("Please confirm by typing 'y': ")
+            if response != 'y':
+                return
     server_cfg = _get_server_cfg(server_name, env_name, mode='reading')
     server_config = _mongozen_cfg()[CfgKey.ENVS.value][env_name][server_name]
     server_cred = _get_mongo_cred()[env_name][server_name][mode]
@@ -309,7 +315,7 @@ def _mongo_cmd(cmd, msg, db_obj, mode, verbose=None):
 
 
 def dump_collection(source_collection, output_dir_path, query=None,
-                    verbose=True):
+                    verbose=True, auto=False):
     """Dumps the contents of the given source collection to the directory in
     the given path.
 
@@ -321,6 +327,9 @@ def dump_collection(source_collection, output_dir_path, query=None,
         The full path to the desired output directory.
     verbose: bool
         Whether to print messages during the operation. Defaults to True.
+    auto : bool, default False
+        If true, does not ask for confirmation before running the command.
+        Otherwise, confirmation is asked if verbose is set to True.
     """
     if verbose:
         doc_count = source_collection.count()
@@ -342,7 +351,7 @@ def dump_collection(source_collection, output_dir_path, query=None,
         source_collection.database, output_dir_path, 'reading', verbose)
 
 
-def restore_collection(target_db, input_file_path, verbose=True):
+def restore_collection(target_db, input_file_path, verbose=True, auto=False):
     """Dumps the contents of the given source collection to the directory in
     the given path.
 
@@ -354,6 +363,9 @@ def restore_collection(target_db, input_file_path, verbose=True):
         The full path to the desired input directory.
     verbose: bool
         Whether to print messages during the operation. Defaults to True.
+    auto : bool, default False
+        If true, does not ask for confirmation before running the command.
+        Otherwise, confirmation is asked if verbose is set to True.
     """
     partially_formatted_cmd = MONGOTEMP_CMD.format(
         cmd='mongorestore',
@@ -373,7 +385,7 @@ EXPORT_CMD = "mongoexport {fields} {query} {type}"
 
 
 def export_collection(collection, output_fpath, fields=None, query=None,
-                      ftype=None, escape_dollar=None, verbose=None):
+                      ftype=None, escape_dollar=None, verbose=None, auto=None):
     """Exports the contents of the given collection to a file.
 
     Parameters
@@ -396,6 +408,9 @@ def export_collection(collection, output_fpath, fields=None, query=None,
         common shells). Defaults to True.
     verbose: bool, optional
         Whether to print messages during the operation. Defaults to True.
+    auto : bool, default False
+        If true, does not ask for confirmation before running the command.
+        Otherwise, confirmation is asked if verbose is set to True.
     """
     print(type(query))
     if ftype is None:
