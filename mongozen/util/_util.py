@@ -256,7 +256,7 @@ def _mongo_cmd(cmd, msg, db_obj, mode, verbose=None, auto=None):
     if verbose is None:
         verbose = True
     if auto is None:
-        verbose = False
+        auto = False
     db_name = db_obj.name
     server_name = db_obj.client.server
     env_name = db_obj.client.env
@@ -412,7 +412,6 @@ def export_collection(collection, output_fpath, fields=None, query=None,
         If true, does not ask for confirmation before running the command.
         Otherwise, confirmation is asked if verbose is set to True.
     """
-    print(type(query))
     if ftype is None:
         ftype = 'csv'
     if escape_dollar is None:
@@ -438,7 +437,7 @@ def export_collection(collection, output_fpath, fields=None, query=None,
         cmd += ' --type="{}"'.format(ftype)
         msg += " with {} file type,".format(ftype)
     _mongo_cmd(cmd=cmd, msg=msg, db_obj=collection.database, mode='reading',
-               verbose=verbose)
+               verbose=verbose, auto=auto)
 
 
 DUMPS_DIR_NAME = '.mongozen_temp_dump'
