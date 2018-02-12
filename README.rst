@@ -34,6 +34,7 @@ Defines a ``Matchop`` class representing a pymongo matching operator. It extends
 
 .. code-block:: python
 
+  from mongozen.matchop import Matchop
   match_dateint = Matchop({'dateInt': {'$gt': 20161203}})
   match_dateint_and_id = match_dateint & {'user_id': 12}
   print(match_dateint_and_id)
