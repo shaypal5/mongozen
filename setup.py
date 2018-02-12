@@ -3,19 +3,18 @@
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import sys
-import warnings
 import setuptools
 import versioneer
 
 
-# Require Python 3.5 or higher
-if sys.version_info.major < 3 or sys.version_info.minor < 4:
-    warnings.warn("mongozen requires Python 3.4 or higher!")
-    sys.exit(1)
-
-
-TEST_REQUIRES = ['pytest', 'coverage', 'pytest-cov']
+TEST_REQUIRES = [
+    # testing and coverage
+    'pytest', 'coverage', 'pytest-cov',
+    # unmandatory dependencies of the package itself
+    'birch', 'pandas', 'pandas.compat',
+    # to be able to run `python setup.py checkdocs`
+    'collective.checkdocs', 'pygments',
+]
 
 with open('README.rst') as f:
     README = f.read()
@@ -24,21 +23,21 @@ setuptools.setup(
     author="Shay Palachy",
     author_email="shay.palachy@gmail.com",
     name='mongozen',
-    description='Enhance MongoDB for Python dynamic shells and scripts.',
+    description='MongoDB utilities for Python',
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
     long_description=README,
     url='https://github.com/shaypal5/mongozen',
     packages=setuptools.find_packages(),
     include_package_data=True,
-    entry_points='''
-    [console_scripts]
-        mongozen=mongozen.scripts.mongozen_cli:cli
-    ''',
+    # entry_points='''
+    # [console_scripts]
+    #     mongozen=mongozen.scripts.mongozen_cli:cli
+    # ''',
+    python_requires=">=3.5",
     install_requires=[
-        'pymongo>=3.4', 'pyyaml', 'pytz', 'tqdm', 'click', 'numpy',
-        'decore', 'comath>=0.0.3', 'strct>=0.0.14', 'utilp>=0.0.7',
-        'utilitime>=0.0.3', 'prettytable'
+        'pymongo', 'numpy', 'prettytable', 'pandas',
+        'strct>=0.0.14', 'utilitime>=0.0.3', 'comath>=0.0.3',
     ],
     extras_require={
         'test': TEST_REQUIRES,
