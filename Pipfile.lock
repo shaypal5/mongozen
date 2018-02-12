@@ -49,6 +49,12 @@
             ],
             "version": "==0.0.5"
         },
+        "collective.checkdocs": {
+            "hashes": [
+                "sha256:3a5328257c5224bc72753820c182910d7fb336bc1dba5e09113d48566655e46e"
+            ],
+            "version": "==0.2"
+        },
         "comath": {
             "hashes": [
                 "sha256:487fc8e14f75e4c07a5b8710c5ffb5117bc16d62324a5ac9a9ff066a777d7ae9",
@@ -108,6 +114,14 @@
                 "sha256:fe67786e12338523848bec5588a658c4d425e12d53eb51cfef870bec8f576134"
             ],
             "version": "==1.0.0"
+        },
+        "docutils": {
+            "hashes": [
+                "sha256:7a4bd47eaf6596e1295ecb11361139febe29b084a87bf005bf899f9a42edc3c6",
+                "sha256:02aec4bd92ab067f6ff27a38a38a41173bf01bed8f89157768c1573f53e474a6",
+                "sha256:51e64ef2ebfb29cae1faa133b3710143496eca21c530f3f71424d77687764274"
+            ],
+            "version": "==0.14"
         },
         "e1839a8": {
             "editable": true,
@@ -197,6 +211,13 @@
                 "sha256:ca18943e28235417756316bfada6cd96b23ce60dd532642690dcfdaba988a76d"
             ],
             "version": "==1.5.2"
+        },
+        "pygments": {
+            "hashes": [
+                "sha256:78f3f434bcc5d6ee09020f92ba487f95ba50f1e3ef83ae96b9d5ffa1bab25c5d",
+                "sha256:dbae1046def0efb574852fab9e90209b23f556367b5a320c0bcb871c77c3e8cc"
+            ],
+            "version": "==2.2.0"
         },
         "pymongo": {
             "hashes": [

@@ -12,6 +12,8 @@ TEST_REQUIRES = [
     'pytest', 'coverage', 'pytest-cov',
     # unmandatory dependencies of the package itself
     'birch', 'pandas', 'pandas.compat',
+    # to be able to run `python setup.py checkdocs`
+    'collective.checkdocs', 'pygments',
 ]
 
 with open('README.rst') as f:
