@@ -10,21 +10,14 @@ from json import JSONDecodeError
 import copy  # for deepcopy-ing dicts
 
 import numpy as np
-import bson
 import utilitime
 from strct.dicts import flatten_dict
+import bson
 from bson.json_util import (
     dumps,
     loads,
 )
 
-from ..shared import (
-    CfgKey,
-    _mongozen_cfg,
-    _get_server_cfg,
-    _get_mongo_cred
-)
-from ..util_constants import HOMEDIR
 
 # ======= module-specific constants ======
 
@@ -237,12 +230,12 @@ def _exec_cmd(cmd):
 
 
 MONGOTEMP_CMD = (
-    '{cmd} --host="{host}" --username="{usr}" --password="{pwd}" --db="{db}"'
+    '{cmd} --host="{host}" {usr} {pwd} --db="{db}"'
     ' {authdb} {readpreference} {verbosity}'
 )
 
 
-CMD_MSG = "{msg} for database={db}, server={server} and environment={env}"
+CMD_MSG = "{msg} for database={db}"
 
 
 def _mongo_cmd(cmd, msg, db_obj, mode, verbose=None, auto=None):
@@ -258,31 +251,40 @@ def _mongo_cmd(cmd, msg, db_obj, mode, verbose=None, auto=None):
     if auto is None:
         auto = False
     db_name = db_obj.name
-    server_name = db_obj.client.server
-    env_name = db_obj.client.env
+    client = db_obj.client
+    client_options = client._MongoClient__options
+    credentials = client_options.credentials
     if verbose:
-        print(CMD_MSG.format(msg=msg, db=db_name, server=server_name,
-                             env=env_name))
+        print(CMD_MSG.format(msg=msg, db=db_name))
         if not auto:
             response = input("Please confirm by typing 'y': ")
             if response != 'y':
                 return
-    server_cfg = _get_server_cfg(server_name, env_name, mode='reading')
-    server_config = _mongozen_cfg()[CfgKey.ENVS.value][env_name][server_name]
-    server_cred = _get_mongo_cred()[env_name][server_name][mode]
+    hosts = ['{}:{}'.format(node[0], node[1]) for node in client.nodes]
     try:
-        repl_set = server_cfg['replicaSet']
-    except KeyError:
+        repl_set = client_options._ClientOptions__replica_set_name
+    except AttributeError:
+        repl_set = None
+    if repl_set is None:
         repl_set = ''
-    host_str = repl_set + '/' + ','.join(server_config['host'])
+    host_str = repl_set + '/' + ','.join(hosts)
     try:
-        authdb = '--authenticationDatabase="{}"'.format(
-            server_cfg['authSource'])
-    except KeyError:
+
+        authdb = '--authenticationDatabase="{}"'.format(credentials.source)
+    except AttributeError:
         authdb = ''
     try:
-        readpref = '--readPreference="{}"'.format(server_cfg['readPreference'])
-    except KeyError:
+        usr = '--username="{}"'.format(credentials.username)
+    except AttributeError:
+        usr = ''
+    try:
+        pwd = '--password="{}"'.format(credentials.password)
+    except AttributeError:
+        pwd = ''
+    try:
+        pref = client_options._ClientOptions__read_preference
+        readpref = '--readPreference="{}"'.format(pref.name.lower())
+    except AttributeError:
         readpref = ''
     verbosity_flag = '--quiet'
     if verbose:
@@ -290,8 +292,8 @@ def _mongo_cmd(cmd, msg, db_obj, mode, verbose=None, auto=None):
     mongo_cmd = MONGOTEMP_CMD.format(
         cmd=cmd,
         host=host_str,
-        usr=server_cred['username'],
-        pwd=server_cred['password'],
+        usr=usr,
+        pwd=pwd,
         db=db_name,
         authdb=authdb,
         readpreference=readpref,
@@ -321,7 +323,7 @@ def dump_collection(source_collection, output_dir_path, query=None,
 
     Arguments
     ---------
-    source_collection : mongozen.mongozen_objs.MongozenCollection
+    source_collection : pymongo.collection.Collection
         The collection whose contents will be dump.
     output_dir_path : str
         The full path to the desired output directory.
@@ -390,7 +392,7 @@ def export_collection(collection, output_fpath, fields=None, query=None,
 
     Parameters
     ----------
-    collection : mongozen.mongozen_objs.MongozenCollection
+    collection : pymongo.collection.Collection
         The collection whose contents will be exported.
     output_fpath : str
         The full path to the desired output file.
@@ -440,8 +442,7 @@ def export_collection(collection, output_fpath, fields=None, query=None,
                verbose=verbose, auto=auto)
 
 
-DUMPS_DIR_NAME = '.mongozen_temp_dump'
-DUMPS_DIR_PATH = os.path.join(HOMEDIR, DUMPS_DIR_NAME)
+DUMPS_DIR_PATH = os.path.expanduser('~/.mongozen_temp_dump')
 
 
 def copy_collection(source_collection, target_db, temp_dir_path=None,
@@ -451,9 +452,9 @@ def copy_collection(source_collection, target_db, temp_dir_path=None,
 
     Arguments
     ---------
-    source_collection : mongozen.mongozen_objs.MongozenCollection
+    source_collection : pymongo.collection.Collection
         The collection whose contents will be copied.
-    target_collection : mongozen.mongozen_objs.MongozenCollection
+    target_collection : pymongo.collection.Collection
         The collection to which all contents of the source collection will be
         copied.
     temp_dir_path: str, optional

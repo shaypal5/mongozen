@@ -20,33 +20,13 @@ __version__ = get_versions()['version']
 del get_versions
 
 # === module imports
-
-from .core import (
-    get_mongo_uri,
-    get_reading_client,
-    get_writing_client,
-    get_db,
-    get_collection,
-    free_unused_clients
-)
-import mongozen.util
 import mongozen.matchop
+import mongozen.queries
+import mongozen.util
 
-# optionally import mongozen.queries
-try:
-    import mongozen.queries
-except ImportError:
-    pass
-    # warnings.warn("mongozen's queries sub-package was not imported. "
-    #               "To use it reinstall with 'pip install mongozen[queries]'.")
-
-
-from .core import _add_env_attr
-_add_env_attr(sys.modules[__name__])
 
 for name in [
-        '_add_env_attr', 'sys', 'warnings', 'constants', 'core', 'name',
-        'param_inference', 'shared', 'mongozen'
+        'sys', 'warnings', 'constants', 'name', 'mongozen'
 ]:
     try:
         globals().pop(name)
