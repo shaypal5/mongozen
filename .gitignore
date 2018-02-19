@@ -106,3 +106,6 @@ ENV/
 
 # vim swap files
 *.swp
+
+# pytest
+.pytest_cache
